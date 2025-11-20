@@ -5,7 +5,7 @@ services:
       args:
         UID: ${UID}
         GID: ${GID}
-    container_name: new-vessel-certificates-app
+    container_name: passage-plan-app
     env_file:
       - .env
     volumes:

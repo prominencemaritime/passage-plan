@@ -1,5 +1,5 @@
 #src/alerts/__init__.py
 """Alert implementations."""
-from .vessel_documents_alert import VesselDocumentsAlert
+from .passage_plan_alert import PassagePlanAlert
 
-__all__ = ['VesselDocumentsAlert']
+__all__ = ['PassagePlanAlert']

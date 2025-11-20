@@ -30,7 +30,7 @@ from src.formatters.html_formatter import HTMLFormatter
 from src.formatters.text_formatter import TextFormatter
 
 # Import alert implementations
-from src.alerts.vessel_documents_alert import VesselDocumentsAlert
+from src.alerts.passage_plan_alert import PassagePlanAlert
 
 
 def setup_logging(config: AlertConfig) -> logging.Logger:
@@ -131,10 +131,10 @@ def register_alerts(scheduler: AlertScheduler, config: AlertConfig) -> None:
     """
     logger = logging.getLogger(__name__)
     
-    # Register Vessel Documents Alert
-    vessel_docs_alert = VesselDocumentsAlert(config)
-    scheduler.register_alert(vessel_docs_alert.run)
-    logger.info("[OK] Registered VesselDocumentsAlert")
+    # Register Passage Plan Alert
+    passage_plan_alert = PassagePlanAlert(config)
+    scheduler.register_alert(passage_plan_alert.run)
+    logger.info("[OK] Registered PassagePlanAlert")
     
     # Future alerts can be registered here:
     # hot_works_alert = HotWorksAlert(config)
