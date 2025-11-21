@@ -58,7 +58,7 @@ class AlertConfig:
     timezone: str
 
     # Alert-specific configurations
-    vessel_documents_lookback_days: int
+    lookback_days: int
 
     # Tracking
     reminder_frequency_days: Union[float, None]
@@ -156,7 +156,7 @@ class AlertConfig:
             base_url=config('BASE_URL', default='https://prominence.orca.tools/'),
 
             # Alert-specific configurations
-            vessel_documents_lookback_days=int(config('VESSEL_DOCUMENTS_LOOKBACK_DAYS', default=1)),
+            lookback_days=int(config('LOOKBACK_DAYS', default=1)),
 
             # Dry-run settings (don't set dry_run here, it's set by CLI flag in main.py)
             dry_run_email=config('DRY_RUN_EMAIL', default='').strip(),
