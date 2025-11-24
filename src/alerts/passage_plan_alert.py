@@ -1,6 +1,6 @@
 #src/alerts/passage_plan.py
 """Passage Plan Alert Implementation.""" 
-from typing import Dict, List 
+from typing import Dict, List, Optional
 import pandas as pd 
 from datetime import datetime, timedelta 
 from zoneinfo import ZoneInfo
@@ -106,6 +106,33 @@ class PassagePlanAlert(BaseAlert):
         return df_filtered
 
 
+    def _get_url_links(self, link_id: int) -> Optional[str]:
+        """
+        Generate URL if links are enabled.
+
+        Constructs URL by combining:
+            - BASE_URL from config (e.g. https://prominence.orca.tools)
+            - URL_PATH from config (e.g. /events)
+            - link_id from database (e.g. 123)
+        Result: https://prominence.orca.tools/events/123
+
+        Args:
+            link_id: in PassagePlan project, given by event.id = event_id
+
+        Returns:
+            Complete URL, or None if links are disabled
+        """
+        if not self.config.enable_links:
+            return None
+
+        # Build URL: BASE_URL + URL_PATH + link_id
+        base_url = self.config.base_url.rstrip('/')
+        url_path = self.config.url_path.rstrip('/')
+        full_url = f"{base_url}{url_path}/{link_id}"
+
+        return full_url
+
+
     def route_notifications(self, df:pd.DataFrame) -> List[Dict]:
         """
         Route data to appropriate recipients.
@@ -125,11 +152,18 @@ class PassagePlanAlert(BaseAlert):
         jobs = []
 
         # Group by vessel
-        grouped = df.groupby(['vessel_id', 'vsl_email'])
+        grouped = df.groupby(['vessel_name', 'vsl_email'])
 
         for (vessel_name, vessel_email), vessel_df in grouped:
             # Determine cc recipients
             cc_recipients = self._get_cc_recipients(vessel_email)
+
+            # Add URLs to dataframe if ENABLE_LINKS
+            if self.config.enable_links:
+                vessel_df = vessel_df.copy()
+                vessel_df['url'] = vessel_df['event_id'].apply(
+                        self._get_url_links
+                )
 
             # Keep full data with tracking columns for the job
             # The formatter will handle which columns to display

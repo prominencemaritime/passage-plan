@@ -13,7 +13,7 @@ from unittest.mock import Mock, MagicMock
 from src.core.config import AlertConfig
 from src.core.tracking import EventTracker
 from src.core.scheduler import AlertScheduler
-from src.alerts.vessel_documents_alert import VesselDocumentsAlert
+from src.alerts.passage_plan_alert import PassagePlanAlert
 
 
 @pytest.fixture

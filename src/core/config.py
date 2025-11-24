@@ -71,6 +71,8 @@ class AlertConfig:
 
     # URLs
     base_url: str
+    enable_links: bool
+    url_path: str
 
     # Runtime objects (injected after initialization)
     tracker: Optional['EventTracker'] = None
@@ -154,6 +156,10 @@ class AlertConfig:
 
             # URLs
             base_url=config('BASE_URL', default='https://prominence.orca.tools/'),
+
+            # Documents links config
+            enable_links=config('ENABLE_LINKS', default='False', cast=bool),
+            url_path=config('URL_PATH', default='/events'),
 
             # Alert-specific configurations
             lookback_days=int(config('LOOKBACK_DAYS', default=1)),

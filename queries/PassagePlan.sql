@@ -28,7 +28,7 @@ LEFT JOIN event_statuses es ON es.id = ed.status_id
 LEFT JOIN event_types et ON et.id = e.type_id
 WHERE
 	et.id = 37  --passage-plan
-	AND es.id = 3   --for-review
+	--AND es.id = 3   --for-review
 	--AND LOWER(e.name) NOT LIKE '%test%'
 	--AND LOWER(e.name) NOT LIKE '%vessel%'
 	AND ed.synced_at >= NOW() - INTERVAL '1 day' * :lookback_days

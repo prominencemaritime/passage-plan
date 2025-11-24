@@ -8,6 +8,7 @@ and responsive design.
 from typing import Dict, Optional
 import pandas as pd
 from datetime import datetime
+from src.formatters.date_formatter import duration
 import logging
 
 logger = logging.getLogger(__name__)
@@ -18,13 +19,37 @@ class HTMLFormatter:
     Generates HTML email content with company branding.
     """
     
-    def format(
-        self,
-        df: pd.DataFrame,
-        run_time: datetime,
-        config: 'AlertConfig',
-        metadata: Optional[Dict] = None
-    ) -> str:
+    def _render_cell(self, column_name: str, value: any, row: pd.Series, enable_links: bool) -> str:
+        """
+        Render table cell with optional link for document_name column.
+
+        Args:
+            column_name: Name of the column being rendered
+            value: Cell value to display
+            row: Complete row data (for accessing document_url if needed)
+            enable_links: Whether links are enabled
+
+        Returns:
+            HTML string for table cell content
+        """
+        # Convert value to string, handle None/NaN
+        if pd.isna(value):
+            display_value = ''
+        else:
+            display_value = str(value)
+
+        # Make event_name clickable if links are enabled
+        if column_name == 'event_name' and enable_links:
+            # Check if url exists in row and has a value
+            if 'url' in row.index and pd.notna(row['url']):
+                url = row['url']
+                return f'<a href="{url}" style="color: #0066cc; text-decoration: none;">{display_value}</a>'
+
+        # Regular cell - no link
+        return display_value
+
+
+    def format(self, df: pd.DataFrame, run_time: datetime, config: 'AlertConfig', metadata: Optional[Dict] = None, enable_links: bool = False) -> str:
         """
         Generate HTML email content from DataFrame.
         
@@ -33,6 +58,7 @@ class HTMLFormatter:
             run_time: Timestamp of this alert run
             config: AlertConfig instance for accessing settings
             metadata: Optional metadata (e.g., vessel_name, alert_title)
+            enable_links: Whether to make column names clickable
             
         Returns:
             HTML string for email body
@@ -225,6 +251,10 @@ class HTMLFormatter:
                 {run_time.strftime('%A, %B %d, %Y at %H:%M %Z')}
             </div>
             <div class="metadata-row">
+                <span class="metadata-label">Schedule Frequency:</span>
+                {duration(config.schedule_frequency_hours)}
+            </div>
+            <div class="metadata-row">
                 <span class="metadata-label">Records Found:</span>
                 <span class="count-badge">{len(df)}</span>
             </div>
@@ -256,14 +286,14 @@ class HTMLFormatter:
             for idx, row in df.iterrows():
                 html += "                <tr>\n"
                 for col in display_columns:
-                    value = row[col]
-                    # Format None/NaN as empty string
-                    if pd.isna(value):
-                        display_value = ""
-                    else:
-                        display_value = str(value)
-
-                    html += f"                    <td>{display_value}</td>\n"
+                    # Use _render_cell to handle links
+                    cell_content = self._render_cell(
+                        column_name=col,
+                        value=row[col],
+                        row=row,
+                        enable_links=enable_links
+                    )
+                    html += f"                    <td>{cell_content}</td>\n"
                 html += "                </tr>\n"
 
             html += """            </tbody>
@@ -285,6 +315,7 @@ class HTMLFormatter:
         
         return html
     
+
     def _build_logos_html(self, config: 'AlertConfig') -> str:
         """
         Build HTML for company logos based on which are available.
