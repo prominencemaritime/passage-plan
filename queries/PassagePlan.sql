@@ -32,5 +32,8 @@ WHERE
 	--AND LOWER(e.name) NOT LIKE '%test%'
 	--AND LOWER(e.name) NOT LIKE '%vessel%'
 	AND ed.synced_at >= NOW() - INTERVAL '1 day' * :lookback_days
+	AND e.deleted_at IS NULL
+	--AND v.email IS NOT NULL
+	--AND v.name IS NOT NULL
 ORDER BY
 	ed.synced_at ASC;

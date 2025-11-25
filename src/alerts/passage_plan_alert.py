@@ -101,7 +101,7 @@ class PassagePlanAlert(BaseAlert):
             # replace NaT by ''
             df_filtered['created_at'] = df_filtered['created_at'].fillna('')
 
-        self.logger.info(f"Filtered to {len(df_filtered)} entr{'y' if len(df_filtered)==1 else 'ies'} synced within last {self.lookback_days} day{'' if len(df_filtered)==1 else 's'}")
+        self.logger.info(f"Filtered to {len(df_filtered)} entr{'y' if len(df_filtered)==1 else 'ies'} synced with LOOKBACK={self.lookback_days} day{'' if len(df_filtered)==1 else 's'}")
 
         return df_filtered
 
@@ -219,15 +219,20 @@ class PassagePlanAlert(BaseAlert):
         cc_list = []
 
         # Check each configured domain
+        entry = 0
+        total_entries = len(self.config.email_routing.items())
         for domain, recipients_config in self.config.email_routing.items():
+            entry += 1
             if domain.lower() in vessel_email_lower:
                 cc_list = recipients_config.get('cc', [])
                 break
+            else:
+                self.logger.info(f"Entry {entry}/{total_entries}: No domain match for vessel_email={vessel_email} (only including internal CC recipients)")
 
         # Always add internal recipients to CC list
-        all_recipients = list(set(cc_list + self.config.internal_recipients))
+        all_cc_recipients = list(set(cc_list + self.config.internal_recipients))
 
-        return all_recipients
+        return all_cc_recipients
 
 
     def _get_company_name(self, vessel_email: str) -> str:

@@ -152,24 +152,24 @@ class BaseAlert(ABC):
 
         try:
             # Step 1: Fetch data
-            self.logger.info("--> Fetching data from database...")
+            self.logger.info("--> Fetching data from database: df = self.fetch_data()")
             df = self.fetch_data()
-            self.logger.info(f"[OK] Fetched {len(df)} record(s)")
+            self.logger.info(f"[OK] Fetched len(df)={len(df)} record{'' if len(df)==1 else 's'}")
 
             if df.empty:
-                self.logger.info("No records found matching query criteria")
+                self.logger.info("No records found matching query criteria: df.empty == True")
                 return False
 
             # Step 2: Validate columns
             self.validate_required_columns(df)
 
             # Step 3: Filter data
-            self.logger.info("--> Applying filtering logic...")
+            self.logger.info("--> Applying filtering logic: df_filtered = self.filter_data(df)")
             df_filtered = self.filter_data(df)
-            self.logger.info(f"[OK] {len(df_filtered)} record(s) after filtering")
+            self.logger.info(f"[OK] len(df_filtered)={len(df_filtered)} record{'' if len(df_filtered)==1 else 's'} after filtering")
 
             if df_filtered.empty:
-                self.logger.info("No records after filtering")
+                self.logger.info("No records after filtering: df_filtered.empty == True")
                 return False
 
             # Step 4: Filter out already-sent events
@@ -183,12 +183,12 @@ class BaseAlert(ABC):
                 self.logger.info("All records have been sent previously. No new notifications.")
                 return False
 
-            self.logger.info(f"[OK] {len(df_unsent)} new record(s) to notify")
+            self.logger.info(f"[OK] len(df_unsent)={len(df_unsent)} new record{'' if len(df_unsent)==1 else 's'} to notify")
 
             # Step 5: Route to recipients
             self.logger.info("--> Routing notifications to recipients...")
             notification_jobs = self.route_notifications(df_unsent)
-            self.logger.info(f"[OK] Created {len(notification_jobs)} notification job(s)")
+            self.logger.info(f"[OK] Created len(notification_jobs)={len(notification_jobs)} notification job{'' if len(notification_jobs)==1 else 's'}")
 
             # Step 6: Send notifications
             success = self._send_notifications(notification_jobs, run_time)
