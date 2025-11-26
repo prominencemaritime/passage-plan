@@ -162,7 +162,7 @@ grep -v "^#\|pytest\|freezegun" requirements.txt | pip install -r /dev/stdin
 2. **Create `.env` file**:
 ```bash
    cp .env.example .env
-   vim .env  # Edit with your settings
+   vi .env  # Edit with your settings
 ```
 
 3. **Build and run**:
@@ -202,7 +202,7 @@ grep -v "^#\|pytest\|freezegun" requirements.txt | pip install -r /dev/stdin
 4. **Create `.env` file**:
 ```bash
    cp .env.example .env
-   vim .env  # Edit with your settings
+   vi .env  # Edit with your settings
 ```
 
 5. **Test the configuration**:
@@ -572,7 +572,7 @@ git init
 
 **Edit `.env`**:
 ```bash
-vim .env
+vi .env
 ```
 
 Key changes for new alert type:
@@ -618,21 +618,20 @@ services:
 #### 5. Create SQL Query
 ```bash
 rm queries/PassagePlan.sql
-vim queries/HotWorkPermits.sql
+vi queries/HotWorkPermits.sql
 ```
 
 **Example query**:
 ```sql
 SELECT 
-    event_id,
-    event_name,
-    vessel_id,
-    vessel_name,
-    vessel_email,
-    created_at,
-    synced_at,
-    status,
-    reviewer_notes
+    e.id AS event_id,
+    e.name AS event_name,
+    v.id AS vessel_id,
+    v.name AS vessel_name,
+    v.email AS vessel_email,
+    e.created_at,
+    ed.synced_at,
+    ed.status
 FROM events e
 LEFT JOIN vessels v ON v.id = e.vessel_id
 LEFT JOIN event_details ed ON ed.event_id = e.id
@@ -647,7 +646,7 @@ ORDER BY ed.synced_at DESC;
 #### 6. Create Alert Implementation
 ```bash
 rm src/alerts/passage_plan_alert.py
-vim src/alerts/hot_works_alert.py
+vi src/alerts/hot_works_alert.py
 ```
 
 **Template**:
@@ -876,9 +875,11 @@ python -m src.main --dry-run --run-once
 
 # Test in Docker
 export UID=$(id -u) GID=$(id -g)
-docker-compose build
+docker-compose build --no-cache  # Use --no-cache to avoid module caching issues
 docker-compose run --rm alerts python -m src.main --dry-run --run-once
 ```
+
+**Important**: When creating a new alert project from a template, always use `--no-cache` for the first build to avoid Python module caching issues from the old project.
 
 #### 10. Deploy to Production
 ```bash
@@ -894,6 +895,8 @@ docker-compose ps
 # View tracking file
 docker-compose exec alerts cat data/sent_alerts.json | jq '.'
 ```
+
+**Note**: If you encounter test failures after deployment (especially `ModuleNotFoundError` for old module names), see [Troubleshooting Issue #9](#9-tests-fail-after-git-pull--docker-caching-old-modules) for cache clearing steps.
 
 ### Automated Script (Optional)
 
@@ -1056,6 +1059,9 @@ docker inspect --format='{{json .State.Health}}' passage-plan-app | jq '.'
 export UID=$(id -u) GID=$(id -g)
 docker-compose build
 
+# Build with no cache (use after code updates, especially module renames)
+docker-compose build --no-cache
+
 # Start
 docker-compose up -d
 
@@ -1080,8 +1086,17 @@ docker-compose exec alerts bash
 # Run tests
 docker-compose run --rm alerts pytest tests/ -v
 
+# Run tests with cache clearing
+docker-compose run --rm alerts pytest tests/ -v --cache-clear
+
 # Remove everything (including volumes)
 docker-compose down -v
+
+# Complete cache clear and rebuild (after git pull with code changes)
+docker-compose down -v && \
+docker images | grep passage-plan | awk '{print $3}' | xargs -r docker rmi && \
+docker builder prune -af && \
+docker-compose build --no-cache
 ```
 
 ---
@@ -1320,6 +1335,50 @@ python -c "from src.core.config import AlertConfig; c = AlertConfig.from_env(); 
 
 # "AttributeError: 'AlertScheduler' object has no attribute..."
 # Solution: Check actual attribute name in src/core/scheduler.py
+```
+
+#### 9. Tests fail after git pull / Docker caching old modules
+**Cause**: Docker is caching old Python bytecode (`.pyc` files) from previous versions
+
+**Symptoms**:
+- Tests pass locally but fail on server after `git pull`
+- Error: `ModuleNotFoundError: No module named 'src.alerts.vessel_documents_alert'` (old module name)
+- Error: `AttributeError: module 'src.alerts' has no attribute 'vessel_documents_alert'`
+- Tests reference old code even after updating files
+
+**Solution** - Complete Docker cache clear:
+```bash
+cd /path/to/passage-plan-alerts
+
+# Step 1: Stop and remove containers completely
+docker-compose down -v
+
+# Step 2: Remove the old image
+docker images | grep passage-plan
+docker rmi <image-id-from-above>  # Or: docker rmi passage-plan-alerts
+
+# Step 3: Clean Docker build cache
+docker builder prune -af
+
+# Step 4: Rebuild with no cache
+docker-compose build --no-cache
+
+# Step 5: Run tests
+docker-compose run --rm alerts pytest tests/ -v --cache-clear
+```
+
+**Why this happens**: When you rename Python modules or update code, Docker can cache:
+- Old `.pyc` bytecode files
+- Old `__pycache__` directories
+- Old Python module imports in the image layers
+
+The `--no-cache` flag forces Docker to rebuild everything from scratch.
+
+**Quick version** (if you're in a hurry):
+```bash
+docker-compose down -v && \
+docker-compose build --no-cache && \
+docker-compose run --rm alerts pytest tests/ -v
 ```
 
 ### Logging & Debugging
@@ -1578,7 +1637,7 @@ cp -r passage-plan-alerts my-new-alert
 cd my-new-alert
 
 # 2. Configure
-vim .env
+vi .env
 
 # 3. Test dry-run
 export UID=$(id -u) GID=$(id -g)
