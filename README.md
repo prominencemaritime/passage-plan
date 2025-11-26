@@ -1,4 +1,4 @@
-# Vessel Documents Alert System
+# Passage Plan Alert System
 
 A modular, production-ready alert system for monitoring database events and sending automated email notifications. Built with a plugin-based architecture that makes it easy to create new alert types by copying and customizing the project.
 
@@ -22,11 +22,11 @@ A modular, production-ready alert system for monitoring database events and send
 
 ## 🎯 Overview
 
-This system monitors a PostgreSQL database for vessel document updates and sends automated email notifications to vessel-specific recipients with company-specific CC lists. The modular architecture allows you to easily create new alert types (hot works, certifications, surveys, etc.) by copying this project and customizing the alert logic.
+This system monitors a PostgreSQL database for passage plan events and sends automated email notifications to vessel-specific recipients with company-specific CC lists. The modular architecture allows you to easily create new alert types (hot works, certifications, surveys, etc.) by copying this project and customizing the alert logic.
 
-**Current Alert Type**: Vessel Document Updates
-- Monitors `vessel_documents` table for records updated in the last 24 hours
-- Sends individual emails to each vessel
+**Current Alert Type**: Passage Plan Events
+- Monitors `events` table for passage plan records (event_type_id=37) synced in the last configurable hours/days
+- Sends individual emails to each vessel with clickable links to view full event details
 - Automatically determines CC recipients based on vessel email domain
 - Tracks sent notifications to prevent duplicates
 - Optional reminder system after configurable days
@@ -81,6 +81,7 @@ This system monitors a PostgreSQL database for vessel document updates and sends
 ### Current Features
 - ✅ **Modular Architecture**: Plugin-based design for easy extensibility
 - ✅ **Email Notifications**: Rich HTML emails with company logos and responsive design
+- ✅ **Clickable Event Links**: Direct links from emails to event details in your application
 - ✅ **Smart Routing**: Automatic CC list selection based on email domain
 - ✅ **Duplicate Prevention**: Tracks sent events to avoid re-sending notifications
 - ✅ **Optional Reminders**: Re-send alerts after configurable days (or never)
@@ -92,12 +93,11 @@ This system monitors a PostgreSQL database for vessel document updates and sends
 - ✅ **Docker Support**: Fully containerized with docker-compose
 - ✅ **SSH Tunnel Support**: Secure remote database access
 - ✅ **Atomic File Operations**: Prevents data corruption on interruption
-- ✅ **Configurable Scheduling**: Run on any frequency (hourly, daily, etc.)
+- ✅ **Configurable Scheduling**: Run on any frequency (hourly, every 30 minutes, daily, etc.)
 - ✅ **Comprehensive Logging**: Rotating logs with detailed execution traces
 - ✅ **Comprehensive Tests**: 59% code coverage with unit and integration tests
 
 ### Future Features (Planned)
-- 🔜 **Document Links**: Clickable links to documents in emails *(not yet implemented)*
 - 🔜 **Microsoft Teams Integration**: Send notifications to Teams channels
 - 🔜 **Slack Integration**: Send notifications to Slack channels
 - 🔜 **Multiple Alert Types**: Hot works, certifications, surveys, etc.
@@ -118,7 +118,7 @@ See `requirements.txt` for exact versions. Key dependencies:
 
 **Core Dependencies**:
 - `python-decouple==3.8` - Environment variable management
-- `pandas==2.2.3` - Data manipulation and analysis
+- `pandas==2.3.3` - Data manipulation and analysis
 - `sqlalchemy==2.0.44` - Database ORM and connection pooling
 - `psycopg2-binary==2.9.11` - PostgreSQL adapter
 - `sshtunnel>=0.4.0,<1.0.0` - SSH tunnel for remote database access
@@ -129,6 +129,7 @@ See `requirements.txt` for exact versions. Key dependencies:
 - `pytest==7.4.3` - Testing framework
 - `pytest-cov==4.1.0` - Coverage reporting
 - `pytest-mock==3.12.0` - Mocking utilities
+- `freezegun==1.4.0` - Time/date mocking for tests
 
 **Install all dependencies**:
 ```bash
@@ -137,7 +138,7 @@ pip install -r requirements.txt
 
 **Install only production dependencies** (exclude testing):
 ```bash
-grep -v "^#\|pytest" requirements.txt | pip install -r /dev/stdin
+grep -v "^#\|pytest\|freezegun" requirements.txt | pip install -r /dev/stdin
 ```
 
 ### Required Accounts/Access
@@ -154,8 +155,8 @@ grep -v "^#\|pytest" requirements.txt | pip install -r /dev/stdin
 1. **Clone or copy the project**:
 ```bash
    cd ~/Dev
-   git clone <repository> vessel-documents-alerts
-   cd vessel-documents-alerts
+   git clone <repository> passage-plan-alerts
+   cd passage-plan-alerts
 ```
 
 2. **Create `.env` file**:
@@ -181,8 +182,8 @@ grep -v "^#\|pytest" requirements.txt | pip install -r /dev/stdin
 1. **Clone or copy the project**:
 ```bash
    cd ~/Dev
-   git clone <repository> vessel-documents-alerts
-   cd vessel-documents-alerts
+   git clone <repository> passage-plan-alerts
+   cd passage-plan-alerts
 ```
 
 2. **Create virtual environment**:
@@ -265,9 +266,19 @@ ENABLE_EMAIL_ALERTS=True
 ENABLE_TEAMS_ALERTS=False
 ENABLE_SPECIAL_TEAMS_EMAIL_ALERT=False
 
-# Document links (not yet implemented)
-ENABLE_DOCUMENT_LINKS=False
+# ============================================================================
+# CLICKABLE LINKS CONFIGURATION
+# ============================================================================
+# Enable clickable links in emails (event_name becomes clickable)
+ENABLE_LINKS=True
+
+# Base URL for your application (e.g., https://prominence.orca.tools)
 BASE_URL=https://prominence.orca.tools
+
+# URL path to events page (e.g., /events)
+# Full URL will be: {BASE_URL}{URL_PATH}/{event_id}
+# Example: https://prominence.orca.tools/events/12345
+URL_PATH=/events
 
 # ============================================================================
 # COMPANY BRANDING
@@ -279,8 +290,8 @@ SEATRADERS_LOGO=trans_logo_seatraders_procreate_small.png
 # SCHEDULING & TRACKING
 # ============================================================================
 # How often to check for new alerts (in hours)
-# Examples: 24 = daily, 0.5 = every 30 minutes, 168 = weekly
-SCHEDULE_FREQUENCY_HOURS=24
+# Examples: 0.5 = every 30 minutes, 1 = hourly, 24 = daily, 168 = weekly
+SCHEDULE_FREQUENCY_HOURS=0.5
 
 # Timezone for all datetime operations
 TIMEZONE=Europe/Athens
@@ -296,8 +307,9 @@ SENT_EVENTS_FILE=sent_alerts.json
 # ============================================================================
 # ALERT-SPECIFIC CONFIGURATION
 # ============================================================================
-# How many days back to look for vessel document updates
-VESSEL_DOCUMENTS_LOOKBACK_DAYS=1
+# How many days back to look for passage plan events
+# Events synced within this window will be included
+LOOKBACK_DAYS=1
 
 # ============================================================================
 # LOGGING
@@ -323,6 +335,13 @@ LOG_BACKUP_COUNT=5
 - **Empty/blank** → Never re-send notifications (track events forever)
 - **Number** (e.g., `30`) → Re-send notifications after X days
 - Events older than X days are removed from tracking file
+
+**Clickable Links Configuration**:
+- **ENABLE_LINKS=True** → Event names in emails become clickable links
+- **BASE_URL** → Your application's base URL (e.g., `https://prominence.orca.tools`)
+- **URL_PATH** → Path to events page (e.g., `/events`)
+- **Result**: Links like `https://prominence.orca.tools/events/12345` where `12345` is the event_id
+- **When disabled**: Event names appear as plain text (no links)
 
 **Email Routing**:
 - System extracts domain from vessel email (e.g., `vessel@vsl.prominencemaritime.com` → `prominencemaritime.com`)
@@ -370,35 +389,35 @@ docker-compose up -d  # Runs continuously
 [OK] Event tracker initialized
 [OK] Email sender initialized (DRY-RUN MODE - emails redirected)
 [OK] Formatters initialized
-[OK] Registered VesselDocumentsAlert
+[OK] Registered PassagePlanAlert
 ============================================================
 ▶ RUN-ONCE MODE: Executing alerts once without scheduling
 ============================================================
 Running 1 alert(s)...
 Executing alert 1/1...
 ============================================================
-▶ VesselDocumentsAlert RUN STARTED
+▶ PassagePlanAlert RUN STARTED
 ============================================================
 --> Fetching data from database...
-[OK] Fetched 7781 record(s)
+[OK] Fetched 245 record(s)
 --> Applying filtering logic...
-[OK] Filtered to 29 document(s) updated in last 1 day(s)
+[OK] Filtered to 12 entries synced in last 1 day(s)
 --> Checking for previously sent notifications...
-[OK] 29 new record(s) to notify
+[OK] 12 new record(s) to notify
 --> Routing notifications to recipients...
 [OK] Created notification job for vessel 'KNOSSOS' (3 document(s))
-[OK] Created notification job for vessel 'MINI' (25 document(s))
+[OK] Created notification job for vessel 'MINI' (8 document(s))
 [OK] Created notification job for vessel 'NONDAS' (1 document(s))
 [OK] Created 3 notification job(s)
 --> Sending notification 1/3...
-[DRY-RUN] Email redirected to: test@company.com
-[DRY-RUN] Original recipient: knossos@vsl.prominencemaritime.com
-[DRY-RUN] Original CC: user1@prominencemaritime.com, user2@prominencemaritime.com
-[DRY-RUN] Subject: AlertDev | KNOSSOS | 3 Vessel Document Updates
+[DRY-RUN-EMAIL] Redirecting to: test@company.com
+[DRY-RUN-EMAIL] Original recipient: knossos@vsl.prominencemaritime.com
+[DRY-RUN-EMAIL] Original CC: user1@prominencemaritime.com, user2@prominencemaritime.com
+[DRY-RUN-EMAIL] Subject: AlertDev | KNOSSOS Passage Plan
 [OK] Sent notification 1/3
 ...
-[OK] Marked 29 event(s) as sent
-◼ VesselDocumentsAlert RUN COMPLETE
+[OK] Marked 12 event(s) as sent
+◼ PassagePlanAlert RUN COMPLETE
 ```
 
 ### Production Output
@@ -410,18 +429,22 @@ Executing alert 1/1...
 [OK] Event tracker initialized
 [OK] Email sender initialized
 [OK] Formatters initialized
-[OK] Registered VesselDocumentsAlert
+[OK] Registered PassagePlanAlert
 ============================================================
-▶ PRODUCTION MODE: Running on schedule (every 24.0 hours)
+▶ SCHEDULER STARTED
+Frequency: Every 30m
+Timezone: Europe/Athens
+Registered alerts: 1
 ============================================================
 [OK] Next run at: 2025-11-20 14:30:00 EET
 Running 1 alert(s)...
 ...
 [OK] Sent notification to knossos@vsl.prominencemaritime.com
 [OK] CC: user1@prominencemaritime.com, user2@prominencemaritime.com
-[OK] Marked 29 event(s) as sent
-◼ VesselDocumentsAlert RUN COMPLETE
-[OK] Sleeping until next run...
+[OK] Marked 12 event(s) as sent
+◼ PassagePlanAlert RUN COMPLETE
+[OK] Sleeping for 30m
+[OK] Next run scheduled at: 2025-11-20 15:00:00 EET
 ```
 
 ---
@@ -469,7 +492,7 @@ Current coverage: **59%** overall
 | `src/core/config.py` | 98% | ✅ Excellent |
 | `src/formatters/text_formatter.py` | 95% | ✅ Excellent |
 | `src/formatters/html_formatter.py` | 91% | ✅ Excellent |
-| `src/alerts/vessel_documents_alert.py` | 88% | ✅ Good |
+| `src/alerts/passage_plan_alert.py` | 88% | ✅ Good |
 | `src/core/base_alert.py` | 74% | ✅ Good |
 | `src/core/tracking.py` | 71% | ⚠️ Acceptable |
 | `src/notifications/email_sender.py` | 57% | ⚠️ Acceptable |
@@ -493,7 +516,7 @@ tests/
 ├── conftest.py                    # Shared fixtures and test configuration
 ├── test_config.py                 # Configuration loading and validation
 ├── test_tracking.py               # Event tracking and duplicate prevention
-├── test_vessel_documents_alert.py # Alert logic and routing
+├── test_passage_plan_alert.py     # Alert logic and routing (update test names)
 ├── test_formatters.py             # Email HTML/text generation
 ├── test_email_sender.py           # Email sending functionality
 ├── test_scheduler.py              # Scheduling and execution
@@ -534,7 +557,7 @@ The modular design makes it easy to create new alert types. **Recommended approa
 #### 1. Copy the Project
 ```bash
 cd ~/Dev
-cp -r vessel-documents-alerts hot-works-alerts
+cp -r passage-plan-alerts hot-works-alerts
 cd hot-works-alerts
 ```
 
@@ -554,8 +577,8 @@ vim .env
 
 Key changes for new alert type:
 ```bash
-# Change schedule (e.g., every 30 minutes for hot works)
-SCHEDULE_FREQUENCY_HOURS=0.5
+# Change schedule (e.g., hourly for hot works)
+SCHEDULE_FREQUENCY_HOURS=1.0
 
 # Change reminder frequency (e.g., weekly reminders)
 REMINDER_FREQUENCY_DAYS=7
@@ -564,7 +587,10 @@ REMINDER_FREQUENCY_DAYS=7
 INTERNAL_RECIPIENTS=hotworks-admin@company.com
 
 # Update lookback period
-HOT_WORKS_LOOKBACK_DAYS=17  # Add new variable
+LOOKBACK_DAYS=7  # Look back 7 days instead of 1
+
+# Update links (if using different URL path)
+URL_PATH=/hot-works
 ```
 
 #### 4. Update Docker Configuration
@@ -591,8 +617,8 @@ services:
 
 #### 5. Create SQL Query
 ```bash
-rm queries/NewVesselCertificates.sql
-vim queries/EventHotWork.sql
+rm queries/PassagePlan.sql
+vim queries/HotWorkPermits.sql
 ```
 
 **Example query**:
@@ -604,26 +630,34 @@ SELECT
     vessel_name,
     vessel_email,
     created_at,
+    synced_at,
     status,
     reviewer_notes
-FROM hot_work_permits
-WHERE status = 'pending_review'
-ORDER BY created_at DESC;
+FROM events e
+LEFT JOIN vessels v ON v.id = e.vessel_id
+LEFT JOIN event_details ed ON ed.event_id = e.id
+LEFT JOIN event_statuses es ON es.id = ed.status_id
+LEFT JOIN event_types et ON et.id = e.type_id
+WHERE et.id = 42  -- hot work permit event type
+  AND ed.synced_at >= NOW() - INTERVAL '1 day' * :lookback_days
+  AND e.deleted_at IS NULL
+ORDER BY ed.synced_at DESC;
 ```
 
 #### 6. Create Alert Implementation
 ```bash
-rm src/alerts/vessel_documents_alert.py
+rm src/alerts/passage_plan_alert.py
 vim src/alerts/hot_works_alert.py
 ```
 
 **Template**:
 ```python
 """Hot Works Alert Implementation."""
-from typing import Dict, List
+from typing import Dict, List, Optional
 import pandas as pd
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+from sqlalchemy import text
 
 from src.core.base_alert import BaseAlert
 from src.core.config import AlertConfig
@@ -636,16 +670,19 @@ class HotWorksAlert(BaseAlert):
     def __init__(self, config: AlertConfig):
         """Initialize hot works alert."""
         super().__init__(config)
-        self.sql_query_file = 'EventHotWork.sql'
-        self.lookback_days = 17  # Look back 17 days
+        self.sql_query_file = 'HotWorkPermits.sql'
+        self.lookback_days = config.lookback_days
     
     def fetch_data(self) -> pd.DataFrame:
         """Fetch hot work permits from database."""
         query_path = self.config.queries_dir / self.sql_query_file
         query_sql = validate_query_file(query_path)
         
+        params = {"lookback_days": self.lookback_days}
+        query = text(query_sql)
+        
         with get_db_connection() as conn:
-            df = pd.read_sql_query(query_sql, conn)
+            df = pd.read_sql_query(query, conn, params=params)
         
         self.logger.info(f"Fetched {len(df)} hot work permit(s)")
         return df
@@ -657,16 +694,41 @@ class HotWorksAlert(BaseAlert):
         
         # Ensure timezone awareness
         tz = ZoneInfo(self.config.timezone)
-        df['created_at'] = pd.to_datetime(df['created_at']).dt.tz_localize('UTC').dt.tz_convert(tz)
+        df['synced_at'] = pd.to_datetime(df['synced_at'])
+        
+        if df['synced_at'].dt.tz is None:
+            df['synced_at'] = df['synced_at'].dt.tz_localize('UTC').dt.tz_convert(tz)
+        else:
+            df['synced_at'] = df['synced_at'].dt.tz_convert(tz)
         
         # Filter by lookback period
         cutoff = datetime.now(tz=tz) - timedelta(days=self.lookback_days)
-        df_filtered = df[df['created_at'] >= cutoff].copy()
+        df_filtered = df[df['synced_at'] >= cutoff].copy()
+        
+        # Format dates for display
+        df_filtered['synced_at'] = df_filtered['synced_at'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        
+        if 'created_at' in df_filtered.columns:
+            df_filtered['created_at'] = pd.to_datetime(
+                df_filtered['created_at'], errors='coerce'
+            ).dt.strftime('%Y-%m-%d')
+            df_filtered['created_at'] = df_filtered['created_at'].fillna('')
         
         self.logger.info(
-            f"Filtered to {len(df_filtered)} permit(s) created in last {self.lookback_days} day(s)"
+            f"Filtered to {len(df_filtered)} permit(s) synced in last {self.lookback_days} day(s)"
         )
         return df_filtered
+    
+    def _get_url_links(self, link_id: int) -> Optional[str]:
+        """Generate URL if links are enabled."""
+        if not self.config.enable_links:
+            return None
+        
+        base_url = self.config.base_url.rstrip('/')
+        url_path = self.config.url_path.rstrip('/')
+        full_url = f"{base_url}{url_path}/{link_id}"
+        
+        return full_url
     
     def route_notifications(self, df: pd.DataFrame) -> List[Dict]:
         """Route permits to appropriate recipients."""
@@ -676,55 +738,108 @@ class HotWorksAlert(BaseAlert):
         jobs = []
         
         # Group by vessel
-        for vessel_id, group in df.groupby('vessel_id'):
-            vessel_name = group.iloc[0]['vessel_name']
-            vessel_email = group.iloc[0]['vessel_email']
+        grouped = df.groupby(['vessel_name', 'vessel_email'])
+        
+        for (vessel_name, vessel_email), vessel_df in grouped:
+            # Determine CC recipients
+            cc_recipients = self._get_cc_recipients(vessel_email)
             
-            # Determine CC recipients based on email domain
-            domain = vessel_email.split('@')[-1]
-            cc_recipients = self._get_cc_recipients_for_domain(domain)
+            # Add URLs if enabled
+            if self.config.enable_links:
+                vessel_df = vessel_df.copy()
+                vessel_df['url'] = vessel_df['event_id'].apply(self._get_url_links)
+            
+            full_data = vessel_df.copy()
+            
+            # Specify display columns
+            display_columns = [
+                'event_id',
+                'event_name',
+                'created_at',
+                'synced_at',
+                'status',
+                'reviewer_notes'
+            ]
             
             job = {
                 'recipients': [vessel_email],
                 'cc_recipients': cc_recipients,
-                'data': group,
+                'data': full_data,
                 'metadata': {
-                    'alert_title': 'Hot Work Permits Requiring Review',
                     'vessel_name': vessel_name,
-                    'vessel_id': vessel_id,
-                    'display_columns': ['event_name', 'created_at', 'status', 'reviewer_notes']
+                    'alert_title': 'Hot Work Permits',
+                    'company_name': self._get_company_name(vessel_email),
+                    'display_columns': display_columns
                 }
             }
             
             jobs.append(job)
+            
             self.logger.info(
-                f"[OK] Created notification job for vessel '{vessel_name}' ({len(group)} permit(s))"
+                f"Created notification for vessel '{vessel_name}' "
+                f"({len(full_data)} permit(s)) -> {vessel_email}"
             )
         
         return jobs
     
+    def _get_cc_recipients(self, vessel_email: str) -> List[str]:
+        """Determine CC recipients based on vessel email domain."""
+        vessel_email_lower = vessel_email.lower()
+        cc_list = []
+        
+        for domain, recipients_config in self.config.email_routing.items():
+            if domain.lower() in vessel_email_lower:
+                cc_list = recipients_config.get('cc', [])
+                break
+        
+        # Always add internal recipients
+        all_cc_recipients = list(set(cc_list + self.config.internal_recipients))
+        return all_cc_recipients
+    
+    def _get_company_name(self, vessel_email: str) -> str:
+        """Determine company name based on vessel email domain."""
+        vessel_email_lower = vessel_email.lower()
+        
+        if 'prominence' in vessel_email_lower:
+            return 'Prominence Maritime S.A.'
+        elif 'seatraders' in vessel_email_lower:
+            return 'Sea Traders S.A.'
+        else:
+            return 'Prominence Maritime S.A.'
+    
     def get_tracking_key(self, row: pd.Series) -> str:
-        """Generate unique tracking key from permit ID."""
-        return f"hotwork_{row['event_id']}"
+        """Generate unique tracking key for a data row."""
+        try:
+            vessel_id = row['vessel_id']
+            event_type_id = row['event_type_id']
+            event_id = row['event_id']
+            
+            return f"vessel_id_{vessel_id}__event_type_{event_type_id}__event_id_{event_id}"
+        
+        except KeyError as e:
+            self.logger.error(f"Missing column in row for tracking key: {e}")
+            self.logger.error(f"Available columns: {list(row.index)}")
+            raise
     
     def get_subject_line(self, data: pd.DataFrame, metadata: Dict) -> str:
-        """Generate email subject line."""
+        """Generate email subject line for a notification."""
+        vessel_name = metadata.get('vessel_name', 'Vessel')
         count = len(data)
-        vessel_name = metadata.get('vessel_name', 'Unknown')
         
         if count == 1:
-            return f"AlertDev | {vessel_name} | Hot Work Permit Requires Review"
-        return f"AlertDev | {vessel_name} | {count} Hot Work Permits Require Review"
+            return f"AlertDev | {vessel_name.upper()} | Hot Work Permit Requires Review"
+        return f"AlertDev | {vessel_name.upper()} | {count} Hot Work Permits Require Review"
     
     def get_required_columns(self) -> List[str]:
-        """Return required DataFrame columns for validation."""
+        """Return list of column names required in the DataFrame."""
         return [
+            'vessel_email',
+            'vessel_id',
+            'event_type_id',
             'event_id',
             'event_name',
-            'vessel_id',
-            'vessel_name',
-            'vessel_email',
             'created_at',
+            'synced_at',
             'status'
         ]
 ```
@@ -808,19 +923,19 @@ rm -rf data/*.json logs/*.log .git
 echo "✏️  Updating alert class references..."
 # macOS (BSD sed)
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    sed -i '' "s/VesselDocumentsAlert/$ALERT_CLASS_NAME/g" src/alerts/__init__.py
-    sed -i '' "s/VesselDocumentsAlert/$ALERT_CLASS_NAME/g" src/main.py
-    sed -i '' "s/new-vessel-certificates-app/$PROJECT_NAME-app/g" docker-compose.yml
+    sed -i '' "s/PassagePlanAlert/$ALERT_CLASS_NAME/g" src/alerts/__init__.py
+    sed -i '' "s/PassagePlanAlert/$ALERT_CLASS_NAME/g" src/main.py
+    sed -i '' "s/passage-plan-app/$PROJECT_NAME-app/g" docker-compose.yml
 else
     # Linux (GNU sed)
-    sed -i "s/VesselDocumentsAlert/$ALERT_CLASS_NAME/g" src/alerts/__init__.py
-    sed -i "s/VesselDocumentsAlert/$ALERT_CLASS_NAME/g" src/main.py
-    sed -i "s/new-vessel-certificates-app/$PROJECT_NAME-app/g" docker-compose.yml
+    sed -i "s/PassagePlanAlert/$ALERT_CLASS_NAME/g" src/alerts/__init__.py
+    sed -i "s/PassagePlanAlert/$ALERT_CLASS_NAME/g" src/main.py
+    sed -i "s/passage-plan-app/$PROJECT_NAME-app/g" docker-compose.yml
 fi
 
 echo "📝 Renaming alert file..."
 ALERT_FILE=$(echo "$ALERT_CLASS_NAME" | sed 's/\([A-Z]\)/_\L\1/g' | sed 's/^_//')".py"
-mv src/alerts/vessel_documents_alert.py "src/alerts/$ALERT_FILE"
+mv src/alerts/passage_plan_alert.py "src/alerts/$ALERT_FILE"
 
 echo "🎉 Initializing new git repository..."
 git init
@@ -901,7 +1016,7 @@ services:
       args:
         UID: ${UID:-1000}
         GID: ${GID:-1000}
-    container_name: new-vessel-certificates-app
+    container_name: passage-plan-app
     env_file:
       - .env
     environment:
@@ -922,7 +1037,7 @@ The Docker container includes a healthcheck that verifies:
 
 **View health status**:
 ```bash
-docker inspect --format='{{.State.Health.Status}}' new-vessel-certificates-app
+docker inspect --format='{{.State.Health.Status}}' passage-plan-app
 
 # Possible values:
 # - healthy: Container is working properly
@@ -932,7 +1047,7 @@ docker inspect --format='{{.State.Health.Status}}' new-vessel-certificates-app
 
 **View health check logs**:
 ```bash
-docker inspect --format='{{json .State.Health}}' new-vessel-certificates-app | jq '.'
+docker inspect --format='{{json .State.Health}}' passage-plan-app | jq '.'
 ```
 
 ### Docker Commands Reference
@@ -975,7 +1090,7 @@ docker-compose down -v
 
 ### Project Structure
 ```
-vessel-documents-alerts/
+passage-plan-alerts/
 ├── .env                          # Configuration (not in git)
 ├── .env.example                  # Configuration template
 ├── .gitignore                    # Git ignore rules
@@ -1005,7 +1120,8 @@ vessel-documents-alerts/
 │   ├── formatters/               # Email formatters (reusable)
 │   │   ├── __init__.py
 │   │   ├── html_formatter.py     # Rich HTML emails (91% coverage)
-│   │   └── text_formatter.py     # Plain text emails (95% coverage)
+│   │   ├── text_formatter.py     # Plain text emails (95% coverage)
+│   │   └── date_formatter.py     # Duration formatting utility
 │   │
 │   ├── utils/                    # Utilities (reusable)
 │   │   ├── __init__.py
@@ -1014,10 +1130,10 @@ vessel-documents-alerts/
 │   │
 │   └── alerts/                   # Alert implementations (customized)
 │       ├── __init__.py
-│       └── vessel_documents_alert.py  # Current alert (88% coverage)
+│       └── passage_plan_alert.py  # Current alert (88% coverage)
 │
 ├── queries/                      # SQL queries (customized)
-│   └── NewVesselCertificates.sql
+│   └── PassagePlan.sql
 │
 ├── media/                        # Company logos
 │   ├── trans_logo_prominence_procreate_small.png
@@ -1033,7 +1149,7 @@ vessel-documents-alerts/
     ├── conftest.py               # Shared fixtures
     ├── test_config.py            # Configuration tests
     ├── test_tracking.py          # Tracking tests
-    ├── test_vessel_documents_alert.py  # Alert logic tests
+    ├── test_passage_plan_alert.py  # Alert logic tests (rename from vessel_documents)
     ├── test_formatters.py        # Formatter tests
     ├── test_email_sender.py      # Email sending tests
     ├── test_scheduler.py         # Scheduler tests
@@ -1079,7 +1195,7 @@ flake8 src/ tests/
 **Solution**:
 ```bash
 # Always run from project root
-cd /path/to/vessel-documents-alerts
+cd /path/to/passage-plan-alerts
 python -m src.main --dry-run --run-once
 ```
 
@@ -1170,10 +1286,30 @@ tz = ZoneInfo(self.config.timezone)
 cutoff = datetime.now(tz=tz)
 
 # Localize database timestamps
-df['created_at'] = df['created_at'].dt.tz_localize('UTC').dt.tz_convert(tz)
+df['synced_at'] = df['synced_at'].dt.tz_localize('UTC').dt.tz_convert(tz)
 ```
 
-#### 7. Test failures
+#### 7. Links not appearing in emails
+**Causes**:
+- `ENABLE_LINKS=False` in `.env`
+- `BASE_URL` or `URL_PATH` not configured correctly
+- `url` column not being added to DataFrame
+
+**Solution**:
+```bash
+# Check link configuration
+grep -E "ENABLE_LINKS|BASE_URL|URL_PATH" .env
+
+# Verify settings
+ENABLE_LINKS=True
+BASE_URL=https://prominence.orca.tools
+URL_PATH=/events
+
+# Test URL generation
+python -c "from src.core.config import AlertConfig; c = AlertConfig.from_env(); print(c.enable_links, c.base_url, c.url_path)"
+```
+
+#### 8. Test failures
 **Common test issues**:
 ```bash
 # "No module named 'src.events_alerts'" (old test files)
@@ -1223,7 +1359,7 @@ docker-compose ps  # Check exit code
 docker-compose logs --tail=50 alerts
 
 # Health check failing
-docker inspect --format='{{json .State.Health}}' new-vessel-certificates-app | jq '.'
+docker inspect --format='{{json .State.Health}}' passage-plan-app | jq '.'
 
 # File permission errors
 # Make sure UID/GID are set correctly:
@@ -1248,13 +1384,15 @@ Before deploying to production:
 - [ ] `DRY_RUN=False` in `.env` for production
 - [ ] `DRY_RUN_EMAIL` contains valid test addresses
 - [ ] Company logos exist in `media/` directory
+- [ ] Link generation works (if `ENABLE_LINKS=True`)
+- [ ] `BASE_URL` and `URL_PATH` configured correctly
 - [ ] Tracking file updates after test run: `cat data/sent_alerts.json`
 - [ ] No duplicates on second dry-run
 - [ ] Docker build succeeds: `docker-compose build`
 - [ ] Container starts: `docker-compose up -d`
 - [ ] Container stays running: `docker-compose ps`
 - [ ] Logs show successful execution: `docker-compose logs -f alerts`
-- [ ] Health check passes: `docker inspect --format='{{.State.Health.Status}}' new-vessel-certificates-app`
+- [ ] Health check passes: `docker inspect --format='{{.State.Health.Status}}' passage-plan-app`
 - [ ] All tests pass: `docker-compose run --rm alerts pytest tests/ -v`
 
 ---
@@ -1353,6 +1491,46 @@ Check: Is tracking_key in sent_alerts.json?
    - CC: matched CC list + INTERNAL_RECIPIENTS
 ```
 
+### Clickable Links System
+```
+1. Check if ENABLE_LINKS=True in config
+   ↓
+2. In alert's route_notifications():
+   - Add 'url' column to DataFrame
+   - Call _get_url_links(event_id) for each row
+   ↓
+3. _get_url_links() constructs URL:
+   - BASE_URL + URL_PATH + event_id
+   - Example: https://prominence.orca.tools/events/12345
+   ↓
+4. In html_formatter._render_cell():
+   - Check if column is 'event_name' and enable_links=True
+   - If 'url' exists in row, wrap event_name in <a> tag
+   - Result: <a href="https://...">Event Name</a>
+   ↓
+5. Email recipient clicks link → Opens event in application
+```
+
+### Tracking Key Format
+
+**Passage Plan System**:
+```python
+def get_tracking_key(self, row: pd.Series) -> str:
+    vessel_id = row['vessel_id']
+    event_type_id = row['event_type_id']
+    event_id = row['event_id']
+    
+    return f"vessel_id_{vessel_id}__event_type_{event_type_id}__event_id_{event_id}"
+
+# Example: "vessel_id_123__event_type_37__event_id_456"
+```
+
+**Why this format**:
+- Uniquely identifies each passage plan event
+- Prevents duplicate notifications for same event
+- Works with reminder system for re-sending after X days
+- Triple underscore `__` clearly separates components
+
 ### Dry-Run Safety Layers
 
 **Three layers of protection**:
@@ -1396,7 +1574,7 @@ Proprietary - Prominence Maritime / Seatraders
 ## 🎉 Quick Start Summary
 ```bash
 # 1. Copy project
-cp -r vessel-documents-alerts my-new-alert
+cp -r passage-plan-alerts my-new-alert
 cd my-new-alert
 
 # 2. Configure
@@ -1417,10 +1595,10 @@ docker-compose up -d
 docker-compose logs -f alerts
 
 # 7. Check health
-docker inspect --format='{{.State.Health.Status}}' <container-name>
+docker inspect --format='{{.State.Health.Status}}' passage-plan-app
 ```
 
-**That's it! You now have a production-ready alert system.** 🚀
+**That's it! You now have a production-ready passage plan alert system with clickable links.** 🚀
 
 ---
 
