@@ -17,7 +17,7 @@ def test_html_formatter_generates_valid_html(mock_config, sample_dataframe):
         'alert_title': 'Test Alert',
         'vessel_name': 'TEST VESSEL',
         'company_name': 'Test Company',
-        'display_columns': ['document_name', 'document_category', 'updated_at']
+        'display_columns': ['event_name', 'status', 'synced_at']
     }
 
     html = formatter.format(sample_dataframe, run_time, mock_config, metadata)
@@ -25,7 +25,7 @@ def test_html_formatter_generates_valid_html(mock_config, sample_dataframe):
     assert '<!DOCTYPE html' in html
     assert 'Test Alert' in html
     assert 'TEST VESSEL' in html
-    assert 'Certificate A' in html
+    assert 'Athens to Piraeus' in html  # First event name
 
 
 def test_html_formatter_handles_empty_dataframe(mock_config):
@@ -50,27 +50,27 @@ def test_html_formatter_displays_only_specified_columns(mock_config, sample_data
 
     metadata = {
         'alert_title': 'Test',
-        'display_columns': ['document_name', 'document_category']  # Only these
+        'display_columns': ['event_name', 'status']  # Only these
     }
 
     html = formatter.format(sample_dataframe, run_time, mock_config, metadata)
 
     # Should include specified columns
-    assert 'Document Name' in html
-    assert 'Document Category' in html
+    assert 'Event Name' in html
+    assert 'Status' in html
 
-    # Should NOT include other columns
-    assert 'Expiration Date' not in html or 'expiration_date' not in html.lower()
+    # Should NOT include other columns in table headers
+    assert 'Created At' not in html or 'created_at' not in html.lower()
 
 
 def test_route_notifications_adds_urls(mock_config, sample_dataframe):
-    """Test that route_notifications adds document_url column when links enabled."""
+    """Test that route_notifications adds url column when links enabled."""
     from src.alerts.passage_plan_alert import PassagePlanAlert
     
     # Enable links
     mock_config.enable_links = True
     mock_config.base_url = 'https://test.com'
-    mock_config.url_path = '/docs'
+    mock_config.url_path = '/events'
     
     alert = PassagePlanAlert(mock_config)
     jobs = alert.route_notifications(sample_dataframe)
@@ -80,58 +80,17 @@ def test_route_notifications_adds_urls(mock_config, sample_dataframe):
         data = job['data']
         
         # Should have url column
-        assert 'document_url' in data.columns
+        assert 'url' in data.columns
         
         # Each URL should be properly formatted
         for idx, row in data.iterrows():
-            expected_url = f"https://test.com/docs/{row['document_id']}"
-            assert row['document_url'] == expected_url
+            expected_url = f"https://test.com/events/{row['event_id']}"
+            assert row['url'] == expected_url
             
-        # Verify _get_document_url was called correctly
-        first_doc_id = data.iloc[0]['document_id']
-        expected_first_url = alert._get_document_url(first_doc_id)
-        assert data.iloc[0]['document_url'] == expected_first_url
-
-
-'''
-def test_html_formatter_creates_links_when_enabled(mock_config, sample_dataframe):
-    """Test that document links are created when enabled."""
-    formatter = HTMLFormatter()
-    run_time = datetime.now()
-
-    mock_config.enable_document_links = True
-    mock_config.base_url = 'https://test.com'
-
-    metadata = {
-        'alert_title': 'Test',
-        'display_columns': ['document_name']
-    }
-
-    html = formatter.format(sample_dataframe, run_time, mock_config, metadata)
-
-    assert 'href=' in html
-    assert 'https://test.com/vessels' in html
-
-
-def test_html_formatter_no_links_when_disabled(mock_config, sample_dataframe):
-    """Test that no links are created when disabled."""
-    formatter = HTMLFormatter()
-    run_time = datetime.now()
-
-    mock_config.enable_document_links = False
-
-    metadata = {
-        'alert_title': 'Test',
-        'display_columns': ['document_name']
-    }
-
-    html = formatter.format(sample_dataframe, run_time, mock_config, metadata)
-
-    # Should contain document name but not as link
-    assert 'Certificate A' in html
-    # href should only be in general page structure, not for documents
-    assert html.count('href=') < 2  # Minimal hrefs, none for documents
-'''
+        # Verify _get_url_links was called correctly
+        first_event_id = data.iloc[0]['event_id']
+        expected_first_url = alert._get_url_links(first_event_id)
+        assert data.iloc[0]['url'] == expected_first_url
 
 
 def test_text_formatter_generates_plain_text(mock_config, sample_dataframe):
@@ -142,14 +101,14 @@ def test_text_formatter_generates_plain_text(mock_config, sample_dataframe):
     metadata = {
         'alert_title': 'Test Alert',
         'vessel_name': 'TEST VESSEL',
-        'display_columns': ['document_name', 'document_category']
+        'display_columns': ['event_name', 'status']
     }
 
     text = formatter.format(sample_dataframe, run_time, mock_config, metadata)
 
     assert 'Test Alert' in text
     assert 'TEST VESSEL' in text
-    assert 'Certificate A' in text
+    assert 'Athens to Piraeus' in text  # First event name
     assert '<' not in text  # No HTML tags
 
 

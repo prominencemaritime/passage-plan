@@ -11,8 +11,8 @@ def test_config_from_env_loads_successfully(monkeypatch, temp_dir):
     """Test that configuration loads from environment variables."""
     # Clear any existing .env values that might interfere
     import os
-    if 'VESSEL_DOCUMENTS_LOOKBACK_DAYS' in os.environ:
-        del os.environ['VESSEL_DOCUMENTS_LOOKBACK_DAYS']
+    if 'LOOKBACK_DAYS' in os.environ:
+        del os.environ['LOOKBACK_DAYS']
 
     # Set environment variables
     monkeypatch.setenv('DB_HOST', 'localhost')
@@ -26,14 +26,14 @@ def test_config_from_env_loads_successfully(monkeypatch, temp_dir):
     monkeypatch.setenv('SMTP_PASS', 'test_pass')
     monkeypatch.setenv('BASE_URL', 'https://test.com')
     monkeypatch.setenv('TIMEZONE', 'Europe/Athens')
-    monkeypatch.setenv('VESSEL_DOCUMENTS_LOOKBACK_DAYS', '1')  # No comment
+    monkeypatch.setenv('LOOKBACK_DAYS', '1')
 
     config = AlertConfig.from_env(project_root=temp_dir)
 
     # Check config attributes that actually exist
     assert config.smtp_user == 'test@test.com'
     assert config.base_url == 'https://test.com'
-    assert config.schedule_frequency_hours == 1.0
+    assert config.schedule_frequency_hours == 0.5  # Default for passage plans
 
 
 def test_config_validation_passes_with_valid_data(mock_config):

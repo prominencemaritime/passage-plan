@@ -46,13 +46,14 @@ def mock_config(temp_dir, monkeypatch):
     monkeypatch.setenv('ENABLE_EMAIL_ALERTS', 'True')
     monkeypatch.setenv('ENABLE_TEAMS_ALERTS', 'False')
     
-    monkeypatch.setenv('SCHEDULE_FREQUENCY_HOURS', '24')
+    monkeypatch.setenv('SCHEDULE_FREQUENCY_HOURS', '0.5')
     monkeypatch.setenv('TIMEZONE', 'Europe/Athens')
     monkeypatch.setenv('REMINDER_FREQUENCY_DAYS', '')  # None
     
     monkeypatch.setenv('BASE_URL', 'https://test.orca.tools')
-    monkeypatch.setenv('VESSEL_DOCUMENTS_LOOKBACK_DAYS', '1')
-    monkeypatch.setenv('ENABLE_DOCUMENT_LINKS', 'True')
+    monkeypatch.setenv('LOOKBACK_DAYS', '1')
+    monkeypatch.setenv('ENABLE_LINKS', 'True')
+    monkeypatch.setenv('URL_PATH', '/events')
     
     monkeypatch.setenv('DRY_RUN_EMAIL', '')
     
@@ -70,32 +71,34 @@ def mock_config(temp_dir, monkeypatch):
 
 @pytest.fixture
 def sample_dataframe():
-    """Create sample vessel documents DataFrame."""
+    """Create sample passage plan DataFrame with correct schema."""
     data = {
-        'vessel_id': [1, 1, 2, 3],
-        'vessel': ['SERIFOS I', 'SERIFOS I', 'AGRIA', 'BALI'],
+        'vessel_id': [101, 101, 102, 103],
+        'vessel_name': ['SERIFOS I', 'SERIFOS I', 'AGRIA', 'BALI'],
         'vsl_email': [
             'serifos.i@vsl.prominencemaritime.com',
             'serifos.i@vsl.prominencemaritime.com',
             'agria@vsl.prominencemaritime.com',
             'bali@vsl.prominencemaritime.com'
         ],
-        'document_id': [101, 102, 201, 301],
-        'document_name': ['Certificate A', 'Certificate B', 'Certificate C', 'Certificate D'],
-        'document_category': ['Safety', 'Safety', 'Technical', 'Safety'],
-        'updated_at': [
+        'event_type_id': [37, 37, 37, 37],
+        'event_type_name': ['Passage Plan', 'Passage Plan', 'Passage Plan', 'Passage Plan'],
+        'event_id': [201, 202, 203, 204],
+        'event_name': ['Athens to Piraeus', 'Piraeus to Rhodes', 'Rhodes to Cyprus', 'Cyprus to Haifa'],
+        'status_id': [3, 3, 3, 3],
+        'status': ['for-review', 'for-review', 'for-review', 'for-review'],
+        'created_at': [
+            datetime.now() - timedelta(days=2),
+            datetime.now() - timedelta(days=1),
+            datetime.now() - timedelta(days=1),
+            datetime.now() - timedelta(days=3)
+        ],
+        'synced_at': [
             datetime.now() - timedelta(hours=1),
             datetime.now() - timedelta(hours=2),
             datetime.now() - timedelta(hours=3),
             datetime.now() - timedelta(hours=4)
-        ],
-        'expiration_date': [
-            datetime.now() + timedelta(days=30),
-            datetime.now() + timedelta(days=60),
-            datetime.now() + timedelta(days=90),
-            None
-        ],
-        'comments': ['Comment 1', 'Comment 2', '', 'Comment 4']
+        ]
     }
     return pd.DataFrame(data)
 
