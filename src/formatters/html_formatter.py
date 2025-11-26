@@ -251,8 +251,8 @@ class HTMLFormatter:
                 {run_time.strftime('%A, %B %d, %Y at %H:%M %Z')}
             </div>
             <div class="metadata-row">
-                <span class="metadata-label">Lookback (to synced at):</span>
-                {duration(config.lookback_days)}
+                <span class="metadata-label">Lookback:</span>
+                {duration(config.lookback_days)} (to synced at)
             </div>
             <div class="metadata-row">
                 <span class="metadata-label">Schedule Frequency:</span>
