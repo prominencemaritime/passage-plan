@@ -172,7 +172,25 @@ grep -v "^#\|pytest\|freezegun" requirements.txt | pip install -r /dev/stdin
    docker-compose up -d
 ```
 
-4. **Verify it's running**:
+4. **Fix directory permissions** (important for Linux servers):
+```bash
+   # Ensure the container can write to logs and data directories
+   # Use your user's UID:GID (check with: id -u and id -g)
+   sudo chown -R $(id -u):$(id -g) logs/ data/
+   
+   # Or if deploying on a server where you know the UID/GID:
+   sudo chown -R 1000:1000 logs/ data/
+   
+   # Alternative (less secure but works):
+   chmod -R 777 logs/ data/
+```
+
+**Note**: This step is especially important when:
+- Deploying to a remote Linux server
+- Using this project as a template for a new alert
+- The directories were created by a different user (e.g., root)
+
+5. **Verify it's running**:
 ```bash
    docker-compose logs -f alerts
 ```
@@ -566,7 +584,12 @@ cd hot-works-alerts
 rm -rf data/*.json logs/*.log
 rm -rf .git  # Optional: start fresh git history
 git init
+
+# Fix directory permissions for Docker
+sudo chown -R $(id -u):$(id -g) logs/ data/
 ```
+
+**Important**: When copying projects between machines or deploying to servers, always fix directory permissions to match the user that will run Docker. This prevents `PermissionError` on startup.
 
 #### 3. Update Configuration
 
@@ -1379,6 +1402,53 @@ The `--no-cache` flag forces Docker to rebuild everything from scratch.
 docker-compose down -v && \
 docker-compose build --no-cache && \
 docker-compose run --rm alerts pytest tests/ -v
+```
+
+#### 10. Permission denied: '/app/logs/alerts.log'
+**Cause**: Docker container doesn't have write permission to mounted volumes
+
+**Symptoms**:
+```bash
+PermissionError: [Errno 13] Permission denied: '/app/logs/alerts.log'
+Container exits with code 1
+```
+
+**Solution**:
+```bash
+# Fix directory permissions
+sudo chown -R $(id -u):$(id -g) logs/ data/
+
+# Or use specific UID:GID (common on servers)
+sudo chown -R 1000:1000 logs/ data/
+
+# Verify permissions
+ls -la logs/ data/
+
+# Restart container
+docker-compose down
+docker-compose up -d
+```
+
+**Why this happens**:
+- The `logs/` and `data/` directories may be owned by root or another user
+- Docker container runs as non-root user for security
+- Mismatched UID/GID between host and container prevents writes
+
+**Best practice**:
+Always run these commands when:
+1. First deploying to a new server
+2. Creating a new project from this template
+3. Cloning the repository to a new machine
+4. Getting permission errors on startup
+
+**Check your UID/GID**:
+```bash
+# Find your user's UID and GID
+id -u  # Usually 1000 on Ubuntu
+id -g  # Usually 1000 on Ubuntu
+
+# Use these values in chown command
+sudo chown -R 1000:1000 logs/ data/
 ```
 
 ### Logging & Debugging
