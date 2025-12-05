@@ -252,7 +252,7 @@ class HTMLFormatter:
             </div>
             <div class="metadata-row">
                 <span class="metadata-label">Lookback:</span>
-                {duration(config.lookback_days)} (to synced at)
+                {duration(config.lookback_days*24)} (to synced at)
             </div>
             <div class="metadata-row">
                 <span class="metadata-label">Schedule Frequency:</span>
