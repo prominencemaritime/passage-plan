@@ -328,47 +328,40 @@ class HTMLFormatter:
         </div>
 """
         else:
-            # Add metadata section
-            html += f"""
-<div class="metadata">
-    <table role="presentation" style="width: 100%; border-collapse: collapse;">
-        <tr>
-            <td style="font-weight: 600; color: #0B4877; padding: 4px 0; width: 180px;">
-                Report Generated:
-            </td>
-            <td style="padding: 4px 0;">
-                {run_time.strftime('%A, %B %d, %Y at %H:%M %Z')}
-            </td>
-        </tr>
-        <tr>
-            <td style="font-weight: 600; color: #0B4877; padding: 4px 0;">
-                Lookback:
-            </td>
-            <td style="padding: 4px 0;">
-                {duration_hours(config.lookback_days*24)} (to synced at)
-            </td>
-        </tr>
-        <tr>
-            <td style="font-weight: 600; color: #0B4877; padding: 4px 0;">
-                Schedule Frequency:
-            </td>
-            <td style="padding: 4px 0;">
-                {duration_hours(config.schedule_frequency_hours)}
-            </td>
-        </tr>
-        <tr>
-            <td style="font-weight: 600; color: #0B4877; padding: 4px 0;">
-                Records Found:
-            </td>
-            <td style="padding: 4px 0;">
-                <span class="count-badge">{len(df)}</span>
-            </td>
-        </tr>
-    </table>
-</div>
-"""
+            if config.include_grey_metadata_section:
+                # Add grey metadata section
+                html += f"""
+                <div class="metadata">
+                    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                """
 
-            # Determine which columns to display
+                # Specify grey metadata entries to be included here:
+                grey_metadata_entries = {
+                        "Report Generated": run_time.strftime('%A, %B %d, %Y at %H:%M %Z'), 
+                        "Lookback": f'{duration_hours(config.lookback_days*24)} (to synced at)' if getattr(config, "lookback_days", None) else None,
+                        "Schedule Frequency": duration_hours(config.schedule_frequency_hours) if getattr(config, "schedule_frequency_hours", None) else None, 
+                        "Records Found": f'<span class="count-badge">{len(df)}</span>'
+                }
+
+                for label, value in grey_metadata_entries.items():
+                    if value is not None:
+                        html += f"""
+                        <tr>
+                            <td style="font-weight: 600; color: #0B4877; padding: 4px 0; width: 180px;">
+                                {label}:
+                            </td>
+                            <td style="padding: 4px 0;">
+                                {value}
+                            </td>
+                        </tr>
+                        """
+
+                html += f"""
+                    </table>
+                </div>
+                """
+
+            # Determine which columns to display in main table
             display_columns = metadata.get('display_columns', list(df.columns))
             # Filter to only columns that exist in the dataframe
             display_columns = [col for col in display_columns if col in df.columns]

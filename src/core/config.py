@@ -59,6 +59,7 @@ class AlertConfig:
 
     # Alert-specific configurations
     lookback_days: int
+    include_grey_metadata_section: bool
 
     # Tracking
     reminder_frequency_days: Union[float, None]
@@ -163,6 +164,7 @@ class AlertConfig:
 
             # Alert-specific configurations
             lookback_days=int(config('LOOKBACK_DAYS', default=1)),
+            include_grey_metadata_section=config('INCLUDE_GREY_METADATA_SECTION', default=False, cast=bool),
 
             # Dry-run settings (don't set dry_run here, it's set by CLI flag in main.py)
             dry_run_email=config('DRY_RUN_EMAIL', default='').strip(),
@@ -181,18 +183,22 @@ class AlertConfig:
         Returns dict mapping domain suffix to recipient configuration:
         {
             'prominencemaritime.com': {
+                'to': ['to_user1@prominencemaritime.com', ...],
                 'cc': ['user1@prominencemaritime.com', ...]
             },
             'seatraders.com': {
+                'to': ['to_user1@seatraders.com', ...],
                 'cc': ['user1@seatraders.com', ...]
             }
         }
         """
         return {
             'prominencemaritime.com': {
+                'to': AlertConfig._parse_email_list('PROMINENCE_EMAIL_TO_RECIPIENTS'),
                 'cc': AlertConfig._parse_email_list('PROMINENCE_EMAIL_CC_RECIPIENTS')
             },
             'seatraders.com': {
+                'to': AlertConfig._parse_email_list('SEATRADERS_EMAIL_TO_RECIPIENTS'),
                 'cc': AlertConfig._parse_email_list('SEATRADERS_EMAIL_CC_RECIPIENTS')
             }
         }
