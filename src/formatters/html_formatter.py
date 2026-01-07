@@ -8,7 +8,7 @@ and responsive design.
 from typing import Dict, Optional
 import pandas as pd
 from datetime import datetime
-from src.formatters.date_formatter import duration
+from src.formatters.date_formatter import duration_hours
 import logging
 
 logger = logging.getLogger(__name__)
@@ -82,7 +82,8 @@ class HTMLFormatter:
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
     body {{
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+        font-family: Tahoma, Verdana, "Segoe UI", Roboto, Arial, sans-serif;
+        font-size: 13px;
         background-color: #f9fafc;
         color: #333;
         line-height: 1.6;
@@ -90,12 +91,18 @@ class HTMLFormatter:
         padding: 0;
     }}
     .container {{
-        max-width: 900px;
+        max-width: 1200px;
+        width: 95%;
         margin: 30px auto;
         background: #ffffff;
         border-radius: 12px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         overflow: hidden;
+    }}
+    .table-wrapper {{
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin: 20px 0;
     }}
     .header {{
         background-color: #0B4877;
@@ -133,10 +140,13 @@ class HTMLFormatter:
     }}
     .metadata {{
         background-color: #f5f8fb;
+        margin-top: 10px;
+        margin-bottom: 10px;
         padding: 15px;
+        padding-top: 10px;
+        padding-bottom: 10px;
         border-radius: 8px;
-        margin-bottom: 25px;
-        font-size: 14px;
+        font-size: 13px;
         border-left: 4px solid #2EA9DE;
     }}
     .metadata-row {{
@@ -146,7 +156,7 @@ class HTMLFormatter:
         font-weight: 600;
         color: #0B4877;
         display: inline-block;
-        min-width: 140px;
+        min-width: 100px;
     }}
     .count-badge {{
         display: inline-block;
@@ -159,9 +169,11 @@ class HTMLFormatter:
     }}
     table {{
         width: 100%;
+        min-width: 400px;
         border-collapse: collapse;
         margin: 20px 0;
-        font-size: 14px;
+        font-size: 13px;
+        font-family: Tahoma, Verdana, "Segoe UI", Roboto, Arial, sans-serif;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }}
     th {{
@@ -170,10 +182,17 @@ class HTMLFormatter:
         text-align: left;
         padding: 12px;
         font-weight: 600;
+        min-width: 80px;
+        word-wrap: break-word;
     }}
     td {{
         padding: 10px 12px;
         border-bottom: 1px solid #e0e6ed;
+        min-width: 80px;
+        word-wrap: break-word;
+    }}
+    th:first-child, td:first-child {{
+        min-width: 80px;
     }}
     tr:nth-child(even) {{
         background-color: #f5f8fb;
@@ -202,20 +221,86 @@ class HTMLFormatter:
         color: #666;
         font-size: 16px;
     }}
-    @media only screen and (max-width: 600px) {{
+    @media only screen and (max-width: 500px) {{
+        .container {{
+            width: 98%;
+            margin: 10px auto;
+            border-radius: 8px;
+        }}
         .header {{
             flex-direction: column;
             text-align: center;
+            padding: 15px;
         }}
         .header-text {{
             text-align: center;
             margin-top: 15px;
         }}
+        .content {{
+            padding: 15px;
+        }}
+        body {{
+            font-size: 13px
+        }}
         table {{
-            font-size: 12px;
+            font-size: 13px;
+            min-width: 500px;
         }}
         th, td {{
             padding: 8px;
+            min-width: 60px;
+            font-size: 13px;
+        }}
+    }}
+    @media only screen and (max-width: 400px) {{
+        .metadata {{ font-size: 12px; }}
+        .container {{
+            width: 98%;
+            margin: 10px auto;
+            border-radius: 8px;
+        }}
+        .header {{
+            flex-direction: column;
+            text-align: center;
+            padding: 15px;
+        }}
+        .header-text {{
+            text-align: center;
+            margin-top: 15px;
+        }}
+        .content {{
+            padding: 15px;
+        }}
+        body {{
+            font-size: 12px
+        }}
+        table {{
+            font-size: 13px;
+            min-width: 400px;
+        }}
+        th, td {{
+            padding: 8px;
+            min-width: 60px;
+            font-size: 12px;
+        }}
+    }}
+    @media only screen and (max-width: 300px) {{
+        .metadata {{ font-size: 11px; }}
+        .container {{
+            width: 100%;
+            margin: 0;
+            border-radius: 0;
+        }}
+        body {{
+            font-size: 11px;
+        }}
+        table {{
+            min-width: 300px;
+        }}
+        th, td {{
+            padding: 6px;
+            min-width: 50px;
+            font-size: 11px;
         }}
     }}
 </style>
@@ -245,24 +330,42 @@ class HTMLFormatter:
         else:
             # Add metadata section
             html += f"""
-        <div class="metadata">
-            <div class="metadata-row">
-                <span class="metadata-label">Report Generated:</span>
+<div class="metadata">
+    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td style="font-weight: 600; color: #0B4877; padding: 4px 0; width: 180px;">
+                Report Generated:
+            </td>
+            <td style="padding: 4px 0;">
                 {run_time.strftime('%A, %B %d, %Y at %H:%M %Z')}
-            </div>
-            <div class="metadata-row">
-                <span class="metadata-label">Lookback:</span>
-                {duration(config.lookback_days*24)} (to synced at)
-            </div>
-            <div class="metadata-row">
-                <span class="metadata-label">Schedule Frequency:</span>
-                {duration(config.schedule_frequency_hours)}
-            </div>
-            <div class="metadata-row">
-                <span class="metadata-label">Records Found:</span>
+            </td>
+        </tr>
+        <tr>
+            <td style="font-weight: 600; color: #0B4877; padding: 4px 0;">
+                Lookback:
+            </td>
+            <td style="padding: 4px 0;">
+                {duration_hours(config.lookback_days*24)} (to synced at)
+            </td>
+        </tr>
+        <tr>
+            <td style="font-weight: 600; color: #0B4877; padding: 4px 0;">
+                Schedule Frequency:
+            </td>
+            <td style="padding: 4px 0;">
+                {duration_hours(config.schedule_frequency_hours)}
+            </td>
+        </tr>
+        <tr>
+            <td style="font-weight: 600; color: #0B4877; padding: 4px 0;">
+                Records Found:
+            </td>
+            <td style="padding: 4px 0;">
                 <span class="count-badge">{len(df)}</span>
-            </div>
-        </div>
+            </td>
+        </tr>
+    </table>
+</div>
 """
 
             # Determine which columns to display
@@ -272,6 +375,7 @@ class HTMLFormatter:
 
             # Build table
             html += """
+        <div class="table-wrapper">
         <table>
             <thead>
                 <tr>
@@ -302,6 +406,7 @@ class HTMLFormatter:
 
             html += """            </tbody>
         </table>
+        </div>
 """
 
         # Footer
